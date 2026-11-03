@@ -5,6 +5,14 @@
 #include <cstddef>
 #include <cstdint>
 
+// OpenGL's calling convention (its headers' APIENTRY): stdcall on 32 bit Windows, where the callee takes its arguments off the
+// stack; the platform's own elsewhere
+#if defined(_WIN32) && defined(__i386__)
+#define TWIN_GL_API __attribute__((stdcall))
+#else
+#define TWIN_GL_API
+#endif
+
 namespace Hw
 {
 using GLenum = unsigned int;
@@ -44,82 +52,82 @@ constexpr GLenum GL_TEXTURE_2D = 0x0DE1, GL_TEXTURE_MIN_FILTER = 0x2801, GL_TEXT
 
 struct Gl
 {
-    void (*GenTextures)(GLsizei, GLuint*);
-    void (*DeleteTextures)(GLsizei, const GLuint*);
-    void (*BindTexture)(GLenum, GLuint);
-    void (*TexImage2D)(GLenum, GLint, GLint, GLsizei, GLsizei, GLint, GLenum, GLenum, const void*);
-    void (*TexSubImage2D)(GLenum, GLint, GLint, GLint, GLsizei, GLsizei, GLenum, GLenum, const void*);
-    void (*TexParameteri)(GLenum, GLenum, GLint);
-    void (*ActiveTexture)(GLenum);
-    void (*PixelStorei)(GLenum, GLint);
-    void (*GenFramebuffers)(GLsizei, GLuint*);
-    void (*DeleteFramebuffers)(GLsizei, const GLuint*);
-    void (*BindFramebuffer)(GLenum, GLuint);
-    void (*FramebufferTexture2D)(GLenum, GLenum, GLenum, GLuint, GLint);
-    GLenum (*CheckFramebufferStatus)(GLenum);
-    void (*BlitFramebuffer)(GLint, GLint, GLint, GLint, GLint, GLint, GLint, GLint, GLbitfield, GLenum);
-    void (*ReadPixels)(GLint, GLint, GLsizei, GLsizei, GLenum, GLenum, void*);
-    void (*ReadBuffer)(GLenum);
-    void (*DrawBuffer)(GLenum);
-    void (*Viewport)(GLint, GLint, GLsizei, GLsizei);
-    void (*Scissor)(GLint, GLint, GLsizei, GLsizei);
-    void (*Enable)(GLenum);
-    void (*Disable)(GLenum);
-    void (*BlendFuncSeparate)(GLenum, GLenum, GLenum, GLenum);
-    void (*BlendEquationSeparate)(GLenum, GLenum);
-    void (*BlendColor)(GLfloat, GLfloat, GLfloat, GLfloat);
-    void (*ColorMask)(GLboolean, GLboolean, GLboolean, GLboolean);
-    void (*DepthMask)(GLboolean);
-    void (*DepthFunc)(GLenum);
-    void (*Clear)(GLbitfield);
-    void (*ClearColor)(GLfloat, GLfloat, GLfloat, GLfloat);
-    GLuint (*CreateShader)(GLenum);
-    void (*ShaderSource)(GLuint, GLsizei, const GLchar* const*, const GLint*);
-    void (*CompileShader)(GLuint);
-    void (*GetShaderiv)(GLuint, GLenum, GLint*);
-    void (*GetShaderInfoLog)(GLuint, GLsizei, GLsizei*, GLchar*);
-    void (*DeleteShader)(GLuint);
-    GLuint (*CreateProgram)();
-    void (*AttachShader)(GLuint, GLuint);
-    void (*BindFragDataLocationIndexed)(GLuint, GLuint, GLuint, const GLchar*);
-    void (*BindAttribLocation)(GLuint, GLuint, const GLchar*);
-    void (*LinkProgram)(GLuint);
-    void (*GetProgramiv)(GLuint, GLenum, GLint*);
-    void (*GetProgramInfoLog)(GLuint, GLsizei, GLsizei*, GLchar*);
-    void (*UseProgram)(GLuint);
-    GLint (*GetUniformLocation)(GLuint, const GLchar*);
-    void (*Uniform1i)(GLint, GLint);
-    void (*Uniform1f)(GLint, GLfloat);
-    void (*Uniform2f)(GLint, GLfloat, GLfloat);
-    void (*Uniform3f)(GLint, GLfloat, GLfloat, GLfloat);
-    void (*Uniform4f)(GLint, GLfloat, GLfloat, GLfloat, GLfloat);
-    void (*Uniform1iv)(GLint, GLsizei, const GLint*);
-    void (*GenVertexArrays)(GLsizei, GLuint*);
-    void (*BindVertexArray)(GLuint);
-    void (*GenBuffers)(GLsizei, GLuint*);
-    void (*BindBuffer)(GLenum, GLuint);
-    void (*BufferData)(GLenum, GLsizeiptr, const void*, GLenum);
-    void (*VertexAttribPointer)(GLuint, GLint, GLenum, GLboolean, GLsizei, const void*);
-    void (*VertexAttribIPointer)(GLuint, GLint, GLenum, GLsizei, const void*);
-    void (*EnableVertexAttribArray)(GLuint);
-    void (*DrawArrays)(GLenum, GLint, GLsizei);
-    void (*Finish)();
-    GLenum (*GetError)();
-    void (*PointSize)(GLfloat);
-    void (*LineWidth)(GLfloat);
-    void (*Uniform4ui)(GLint, GLuint, GLuint, GLuint, GLuint);
-    void (*Uniform1ui)(GLint, GLuint);
-    void (*StencilFunc)(GLenum, GLint, GLuint);
-    void (*TexParameterf)(GLenum, GLenum, GLfloat);
-    void (*GenerateMipmap)(GLenum);
-    void (*StencilOp)(GLenum, GLenum, GLenum);
-    void (*StencilMask)(GLuint);
-    void (*ClearStencil)(GLint);
+    void (TWIN_GL_API *GenTextures)(GLsizei, GLuint*);
+    void (TWIN_GL_API *DeleteTextures)(GLsizei, const GLuint*);
+    void (TWIN_GL_API *BindTexture)(GLenum, GLuint);
+    void (TWIN_GL_API *TexImage2D)(GLenum, GLint, GLint, GLsizei, GLsizei, GLint, GLenum, GLenum, const void*);
+    void (TWIN_GL_API *TexSubImage2D)(GLenum, GLint, GLint, GLint, GLsizei, GLsizei, GLenum, GLenum, const void*);
+    void (TWIN_GL_API *TexParameteri)(GLenum, GLenum, GLint);
+    void (TWIN_GL_API *ActiveTexture)(GLenum);
+    void (TWIN_GL_API *PixelStorei)(GLenum, GLint);
+    void (TWIN_GL_API *GenFramebuffers)(GLsizei, GLuint*);
+    void (TWIN_GL_API *DeleteFramebuffers)(GLsizei, const GLuint*);
+    void (TWIN_GL_API *BindFramebuffer)(GLenum, GLuint);
+    void (TWIN_GL_API *FramebufferTexture2D)(GLenum, GLenum, GLenum, GLuint, GLint);
+    GLenum (TWIN_GL_API *CheckFramebufferStatus)(GLenum);
+    void (TWIN_GL_API *BlitFramebuffer)(GLint, GLint, GLint, GLint, GLint, GLint, GLint, GLint, GLbitfield, GLenum);
+    void (TWIN_GL_API *ReadPixels)(GLint, GLint, GLsizei, GLsizei, GLenum, GLenum, void*);
+    void (TWIN_GL_API *ReadBuffer)(GLenum);
+    void (TWIN_GL_API *DrawBuffer)(GLenum);
+    void (TWIN_GL_API *Viewport)(GLint, GLint, GLsizei, GLsizei);
+    void (TWIN_GL_API *Scissor)(GLint, GLint, GLsizei, GLsizei);
+    void (TWIN_GL_API *Enable)(GLenum);
+    void (TWIN_GL_API *Disable)(GLenum);
+    void (TWIN_GL_API *BlendFuncSeparate)(GLenum, GLenum, GLenum, GLenum);
+    void (TWIN_GL_API *BlendEquationSeparate)(GLenum, GLenum);
+    void (TWIN_GL_API *BlendColor)(GLfloat, GLfloat, GLfloat, GLfloat);
+    void (TWIN_GL_API *ColorMask)(GLboolean, GLboolean, GLboolean, GLboolean);
+    void (TWIN_GL_API *DepthMask)(GLboolean);
+    void (TWIN_GL_API *DepthFunc)(GLenum);
+    void (TWIN_GL_API *Clear)(GLbitfield);
+    void (TWIN_GL_API *ClearColor)(GLfloat, GLfloat, GLfloat, GLfloat);
+    GLuint (TWIN_GL_API *CreateShader)(GLenum);
+    void (TWIN_GL_API *ShaderSource)(GLuint, GLsizei, const GLchar* const*, const GLint*);
+    void (TWIN_GL_API *CompileShader)(GLuint);
+    void (TWIN_GL_API *GetShaderiv)(GLuint, GLenum, GLint*);
+    void (TWIN_GL_API *GetShaderInfoLog)(GLuint, GLsizei, GLsizei*, GLchar*);
+    void (TWIN_GL_API *DeleteShader)(GLuint);
+    GLuint (TWIN_GL_API *CreateProgram)();
+    void (TWIN_GL_API *AttachShader)(GLuint, GLuint);
+    void (TWIN_GL_API *BindFragDataLocationIndexed)(GLuint, GLuint, GLuint, const GLchar*);
+    void (TWIN_GL_API *BindAttribLocation)(GLuint, GLuint, const GLchar*);
+    void (TWIN_GL_API *LinkProgram)(GLuint);
+    void (TWIN_GL_API *GetProgramiv)(GLuint, GLenum, GLint*);
+    void (TWIN_GL_API *GetProgramInfoLog)(GLuint, GLsizei, GLsizei*, GLchar*);
+    void (TWIN_GL_API *UseProgram)(GLuint);
+    GLint (TWIN_GL_API *GetUniformLocation)(GLuint, const GLchar*);
+    void (TWIN_GL_API *Uniform1i)(GLint, GLint);
+    void (TWIN_GL_API *Uniform1f)(GLint, GLfloat);
+    void (TWIN_GL_API *Uniform2f)(GLint, GLfloat, GLfloat);
+    void (TWIN_GL_API *Uniform3f)(GLint, GLfloat, GLfloat, GLfloat);
+    void (TWIN_GL_API *Uniform4f)(GLint, GLfloat, GLfloat, GLfloat, GLfloat);
+    void (TWIN_GL_API *Uniform1iv)(GLint, GLsizei, const GLint*);
+    void (TWIN_GL_API *GenVertexArrays)(GLsizei, GLuint*);
+    void (TWIN_GL_API *BindVertexArray)(GLuint);
+    void (TWIN_GL_API *GenBuffers)(GLsizei, GLuint*);
+    void (TWIN_GL_API *BindBuffer)(GLenum, GLuint);
+    void (TWIN_GL_API *BufferData)(GLenum, GLsizeiptr, const void*, GLenum);
+    void (TWIN_GL_API *VertexAttribPointer)(GLuint, GLint, GLenum, GLboolean, GLsizei, const void*);
+    void (TWIN_GL_API *VertexAttribIPointer)(GLuint, GLint, GLenum, GLsizei, const void*);
+    void (TWIN_GL_API *EnableVertexAttribArray)(GLuint);
+    void (TWIN_GL_API *DrawArrays)(GLenum, GLint, GLsizei);
+    void (TWIN_GL_API *Finish)();
+    GLenum (TWIN_GL_API *GetError)();
+    void (TWIN_GL_API *PointSize)(GLfloat);
+    void (TWIN_GL_API *LineWidth)(GLfloat);
+    void (TWIN_GL_API *Uniform4ui)(GLint, GLuint, GLuint, GLuint, GLuint);
+    void (TWIN_GL_API *Uniform1ui)(GLint, GLuint);
+    void (TWIN_GL_API *StencilFunc)(GLenum, GLint, GLuint);
+    void (TWIN_GL_API *TexParameterf)(GLenum, GLenum, GLfloat);
+    void (TWIN_GL_API *GenerateMipmap)(GLenum);
+    void (TWIN_GL_API *StencilOp)(GLenum, GLenum, GLenum);
+    void (TWIN_GL_API *StencilMask)(GLuint);
+    void (TWIN_GL_API *ClearStencil)(GLint);
     // The render thread's hand-over of the shown picture to the window's context
-    void (*Flush)();
-    GLsync (*FenceSync)(GLenum, GLbitfield);
-    void (*WaitSync)(GLsync, GLbitfield, GLuint64);
-    void (*DeleteSync)(GLsync);
+    void (TWIN_GL_API *Flush)();
+    GLsync (TWIN_GL_API *FenceSync)(GLenum, GLbitfield);
+    void (TWIN_GL_API *WaitSync)(GLsync, GLbitfield, GLuint64);
+    void (TWIN_GL_API *DeleteSync)(GLsync);
 };
 
 // The entry points (loaded the first time, with a context current); false when one is missing

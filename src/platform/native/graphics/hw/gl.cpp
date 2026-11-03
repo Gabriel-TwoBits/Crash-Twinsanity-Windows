@@ -19,7 +19,7 @@ bool g_Loaded = false;
 // The hardware renderer asks for its passes' uniforms by name every time it uses them (thousands a frame), and the driver looks
 // each name up again: the answers kept, a thread's (each has its own context) by program and name. The renderer's programs live
 // as long as it does, so an answer never goes stale
-GLint (*g_GetUniformLocation)(GLuint, const GLchar*) = nullptr;
+GLint (TWIN_GL_API *g_GetUniformLocation)(GLuint, const GLchar*) = nullptr;
 
 struct NameHash
 {
@@ -30,7 +30,8 @@ struct NameHash
     }
 };
 
-GLint CachedUniformLocation(GLuint program, const GLchar* name)
+// In OpenGL's convention: it takes Gl::GetUniformLocation's place
+GLint TWIN_GL_API CachedUniformLocation(GLuint program, const GLchar* name)
 {
     thread_local std::unordered_map<GLuint, std::unordered_map<std::string, GLint, NameHash, std::equal_to<>>> cache;
     auto& names = cache[program];

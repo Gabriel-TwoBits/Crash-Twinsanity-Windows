@@ -5,6 +5,7 @@
 // native/design/options/spiral_grey.svg: two Archimedean arms r = 10 + 35.45 theta over 2.2 turns), images
 #include "ui/overlayinternal.h"
 
+#include "graphics/hw/gl.h"
 #include "graphics/presenter.h"
 #include "native.h"
 
@@ -67,50 +68,50 @@ constexpr GLenum GL_PACK_ALIGNMENT = 0x0D05;
 
 struct Gl
 {
-    void (*Enable)(GLenum);
-    void (*Disable)(GLenum);
-    void (*BlendFuncSeparate)(GLenum, GLenum, GLenum, GLenum);
-    void (*Scissor)(GLint, GLint, GLsizei, GLsizei);
-    void (*Viewport)(GLint, GLint, GLsizei, GLsizei);
-    void (*GenTextures)(GLsizei, GLuint*);
-    void (*BindTexture)(GLenum, GLuint);
-    void (*ActiveTexture)(GLenum);
-    void (*TexParameteri)(GLenum, GLenum, GLint);
-    void (*TexImage2D)(GLenum, GLint, GLint, GLsizei, GLsizei, GLint, GLenum, GLenum, const void*);
-    void (*PixelStorei)(GLenum, GLint);
-    void (*GenBuffers)(GLsizei, GLuint*);
-    void (*BindBuffer)(GLenum, GLuint);
-    void (*BufferData)(GLenum, GLsizeiptr, const void*, GLenum);
-    void (*GenVertexArrays)(GLsizei, GLuint*);
-    void (*BindVertexArray)(GLuint);
-    void (*EnableVertexAttribArray)(GLuint);
-    void (*VertexAttribPointer)(GLuint, GLint, GLenum, GLboolean, GLsizei, const void*);
-    GLuint (*CreateShader)(GLenum);
-    void (*ShaderSource)(GLuint, GLsizei, const GLchar* const*, const GLint*);
-    void (*CompileShader)(GLuint);
-    void (*GetShaderiv)(GLuint, GLenum, GLint*);
-    void (*GetShaderInfoLog)(GLuint, GLsizei, GLsizei*, GLchar*);
-    GLuint (*CreateProgram)();
-    void (*AttachShader)(GLuint, GLuint);
-    void (*BindAttribLocation)(GLuint, GLuint, const GLchar*);
-    void (*LinkProgram)(GLuint);
-    void (*GetProgramiv)(GLuint, GLenum, GLint*);
-    void (*GetProgramInfoLog)(GLuint, GLsizei, GLsizei*, GLchar*);
-    void (*UseProgram)(GLuint);
-    GLint (*GetUniformLocation)(GLuint, const GLchar*);
-    void (*Uniform1i)(GLint, GLint);
-    void (*Uniform1f)(GLint, GLfloat);
-    void (*Uniform2f)(GLint, GLfloat, GLfloat);
-    void (*Uniform4f)(GLint, GLfloat, GLfloat, GLfloat, GLfloat);
-    void (*DrawArrays)(GLenum, GLint, GLsizei);
-    void (*GenFramebuffers)(GLsizei, GLuint*);
-    void (*BindFramebuffer)(GLenum, GLuint);
-    void (*FramebufferTexture2D)(GLenum, GLenum, GLenum, GLuint, GLint);
-    void (*ClearColor)(GLfloat, GLfloat, GLfloat, GLfloat);
-    void (*Clear)(GLbitfield);
-    void (*ReadPixels)(GLint, GLint, GLsizei, GLsizei, GLenum, GLenum, void*);
-    void (*DeleteTextures)(GLsizei, const GLuint*);
-    void (*DeleteFramebuffers)(GLsizei, const GLuint*);
+    void (TWIN_GL_API *Enable)(GLenum);
+    void (TWIN_GL_API *Disable)(GLenum);
+    void (TWIN_GL_API *BlendFuncSeparate)(GLenum, GLenum, GLenum, GLenum);
+    void (TWIN_GL_API *Scissor)(GLint, GLint, GLsizei, GLsizei);
+    void (TWIN_GL_API *Viewport)(GLint, GLint, GLsizei, GLsizei);
+    void (TWIN_GL_API *GenTextures)(GLsizei, GLuint*);
+    void (TWIN_GL_API *BindTexture)(GLenum, GLuint);
+    void (TWIN_GL_API *ActiveTexture)(GLenum);
+    void (TWIN_GL_API *TexParameteri)(GLenum, GLenum, GLint);
+    void (TWIN_GL_API *TexImage2D)(GLenum, GLint, GLint, GLsizei, GLsizei, GLint, GLenum, GLenum, const void*);
+    void (TWIN_GL_API *PixelStorei)(GLenum, GLint);
+    void (TWIN_GL_API *GenBuffers)(GLsizei, GLuint*);
+    void (TWIN_GL_API *BindBuffer)(GLenum, GLuint);
+    void (TWIN_GL_API *BufferData)(GLenum, GLsizeiptr, const void*, GLenum);
+    void (TWIN_GL_API *GenVertexArrays)(GLsizei, GLuint*);
+    void (TWIN_GL_API *BindVertexArray)(GLuint);
+    void (TWIN_GL_API *EnableVertexAttribArray)(GLuint);
+    void (TWIN_GL_API *VertexAttribPointer)(GLuint, GLint, GLenum, GLboolean, GLsizei, const void*);
+    GLuint (TWIN_GL_API *CreateShader)(GLenum);
+    void (TWIN_GL_API *ShaderSource)(GLuint, GLsizei, const GLchar* const*, const GLint*);
+    void (TWIN_GL_API *CompileShader)(GLuint);
+    void (TWIN_GL_API *GetShaderiv)(GLuint, GLenum, GLint*);
+    void (TWIN_GL_API *GetShaderInfoLog)(GLuint, GLsizei, GLsizei*, GLchar*);
+    GLuint (TWIN_GL_API *CreateProgram)();
+    void (TWIN_GL_API *AttachShader)(GLuint, GLuint);
+    void (TWIN_GL_API *BindAttribLocation)(GLuint, GLuint, const GLchar*);
+    void (TWIN_GL_API *LinkProgram)(GLuint);
+    void (TWIN_GL_API *GetProgramiv)(GLuint, GLenum, GLint*);
+    void (TWIN_GL_API *GetProgramInfoLog)(GLuint, GLsizei, GLsizei*, GLchar*);
+    void (TWIN_GL_API *UseProgram)(GLuint);
+    GLint (TWIN_GL_API *GetUniformLocation)(GLuint, const GLchar*);
+    void (TWIN_GL_API *Uniform1i)(GLint, GLint);
+    void (TWIN_GL_API *Uniform1f)(GLint, GLfloat);
+    void (TWIN_GL_API *Uniform2f)(GLint, GLfloat, GLfloat);
+    void (TWIN_GL_API *Uniform4f)(GLint, GLfloat, GLfloat, GLfloat, GLfloat);
+    void (TWIN_GL_API *DrawArrays)(GLenum, GLint, GLsizei);
+    void (TWIN_GL_API *GenFramebuffers)(GLsizei, GLuint*);
+    void (TWIN_GL_API *BindFramebuffer)(GLenum, GLuint);
+    void (TWIN_GL_API *FramebufferTexture2D)(GLenum, GLenum, GLenum, GLuint, GLint);
+    void (TWIN_GL_API *ClearColor)(GLfloat, GLfloat, GLfloat, GLfloat);
+    void (TWIN_GL_API *Clear)(GLbitfield);
+    void (TWIN_GL_API *ReadPixels)(GLint, GLint, GLsizei, GLsizei, GLenum, GLenum, void*);
+    void (TWIN_GL_API *DeleteTextures)(GLsizei, const GLuint*);
+    void (TWIN_GL_API *DeleteFramebuffers)(GLsizei, const GLuint*);
 };
 
 template <typename T> void Load(T& function, const char* name)

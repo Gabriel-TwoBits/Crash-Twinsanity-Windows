@@ -9,6 +9,7 @@
 #include "png.h"
 #include "presenter.h"
 #include "settings.h"
+#include "hw/gl.h"
 #include "hw/hwgs.h"
 #include "hw/replace.h"
 #include "resolution.h"
@@ -68,43 +69,43 @@ constexpr GLenum GL_TEXTURE0 = 0x84C0;
 
 struct Gl
 {
-    void (*GenTextures)(GLsizei, GLuint*);
-    void (*BindTexture)(GLenum, GLuint);
-    void (*TexParameteri)(GLenum, GLenum, GLint);
-    void (*TexImage2D)(GLenum, GLint, GLint, GLsizei, GLsizei, GLint, GLenum, GLenum, const void*);
-    void (*Viewport)(GLint, GLint, GLsizei, GLsizei);
-    void (*ClearColor)(GLfloat, GLfloat, GLfloat, GLfloat);
-    void (*Clear)(GLbitfield);
-    void (*DrawArrays)(GLenum, GLint, GLsizei);
-    GLuint (*CreateShader)(GLenum);
-    void (*ShaderSource)(GLuint, GLsizei, const GLchar* const*, const GLint*);
-    void (*CompileShader)(GLuint);
-    void (*GetShaderiv)(GLuint, GLenum, GLint*);
-    void (*GetShaderInfoLog)(GLuint, GLsizei, GLsizei*, GLchar*);
-    GLuint (*CreateProgram)();
-    void (*AttachShader)(GLuint, GLuint);
-    void (*LinkProgram)(GLuint);
-    void (*GetProgramiv)(GLuint, GLenum, GLint*);
-    void (*UseProgram)(GLuint);
-    GLint (*GetUniformLocation)(GLuint, const GLchar*);
-    void (*Uniform1i)(GLint, GLint);
-    void (*GenVertexArrays)(GLsizei, GLuint*);
-    void (*BindVertexArray)(GLuint);
-    void (*ActiveTexture)(GLenum);
-    void (*Uniform2f)(GLint, GLfloat, GLfloat);
-    void (*Uniform1f)(GLint, GLfloat);
-    void (*DeleteProgram)(GLuint);
-    void (*DeleteShader)(GLuint);
-    void (*BindFramebuffer)(GLenum, GLuint);
-    void (*Enable)(GLenum);
-    void (*Disable)(GLenum);
-    void (*ColorMask)(GLboolean, GLboolean, GLboolean, GLboolean);
-    void (*Uniform4f)(GLint, GLfloat, GLfloat, GLfloat, GLfloat);
+    void (TWIN_GL_API *GenTextures)(GLsizei, GLuint*);
+    void (TWIN_GL_API *BindTexture)(GLenum, GLuint);
+    void (TWIN_GL_API *TexParameteri)(GLenum, GLenum, GLint);
+    void (TWIN_GL_API *TexImage2D)(GLenum, GLint, GLint, GLsizei, GLsizei, GLint, GLenum, GLenum, const void*);
+    void (TWIN_GL_API *Viewport)(GLint, GLint, GLsizei, GLsizei);
+    void (TWIN_GL_API *ClearColor)(GLfloat, GLfloat, GLfloat, GLfloat);
+    void (TWIN_GL_API *Clear)(GLbitfield);
+    void (TWIN_GL_API *DrawArrays)(GLenum, GLint, GLsizei);
+    GLuint (TWIN_GL_API *CreateShader)(GLenum);
+    void (TWIN_GL_API *ShaderSource)(GLuint, GLsizei, const GLchar* const*, const GLint*);
+    void (TWIN_GL_API *CompileShader)(GLuint);
+    void (TWIN_GL_API *GetShaderiv)(GLuint, GLenum, GLint*);
+    void (TWIN_GL_API *GetShaderInfoLog)(GLuint, GLsizei, GLsizei*, GLchar*);
+    GLuint (TWIN_GL_API *CreateProgram)();
+    void (TWIN_GL_API *AttachShader)(GLuint, GLuint);
+    void (TWIN_GL_API *LinkProgram)(GLuint);
+    void (TWIN_GL_API *GetProgramiv)(GLuint, GLenum, GLint*);
+    void (TWIN_GL_API *UseProgram)(GLuint);
+    GLint (TWIN_GL_API *GetUniformLocation)(GLuint, const GLchar*);
+    void (TWIN_GL_API *Uniform1i)(GLint, GLint);
+    void (TWIN_GL_API *GenVertexArrays)(GLsizei, GLuint*);
+    void (TWIN_GL_API *BindVertexArray)(GLuint);
+    void (TWIN_GL_API *ActiveTexture)(GLenum);
+    void (TWIN_GL_API *Uniform2f)(GLint, GLfloat, GLfloat);
+    void (TWIN_GL_API *Uniform1f)(GLint, GLfloat);
+    void (TWIN_GL_API *DeleteProgram)(GLuint);
+    void (TWIN_GL_API *DeleteShader)(GLuint);
+    void (TWIN_GL_API *BindFramebuffer)(GLenum, GLuint);
+    void (TWIN_GL_API *Enable)(GLenum);
+    void (TWIN_GL_API *Disable)(GLenum);
+    void (TWIN_GL_API *ColorMask)(GLboolean, GLboolean, GLboolean, GLboolean);
+    void (TWIN_GL_API *Uniform4f)(GLint, GLfloat, GLfloat, GLfloat, GLfloat);
     // The render thread's pictures: their fences
-    void (*Flush)();
-    GLsync (*FenceSync)(GLenum, GLbitfield);
-    void (*WaitSync)(GLsync, GLbitfield, unsigned long long);
-    void (*DeleteSync)(GLsync);
+    void (TWIN_GL_API *Flush)();
+    GLsync (TWIN_GL_API *FenceSync)(GLenum, GLbitfield);
+    void (TWIN_GL_API *WaitSync)(GLsync, GLbitfield, unsigned long long);
+    void (TWIN_GL_API *DeleteSync)(GLsync);
 };
 
 struct Presenter
