@@ -8,9 +8,12 @@ registers make it faster.
 It is cross-compiled on Linux with clang and the distribution's MinGW-w64, whose C runtime is the system's `msvcrt.dll`
 (Windows 7 has it; the 64 bit build's UCRT needs an update there).
 
-**Tested:** in Wine 10 (Debian 13), on the 64 bit host with the 32 bit Windows program: the self-tests (`--selftest-abi`,
-`--selftest-lowmemory`) and levels played with the level sweep's scripted input (native/LEVEL_SWEEP.md).
-**Not tested yet:** a real Windows 7, and Intel's OpenGL driver.
+**Tested:** in Wine 10 (Debian 13, Mesa), the 32 bit Windows program: the self-tests (`--selftest-abi`,
+`--selftest-lowmemory`, `--selftest-ui`), the start-up's movies and the options' screens, and the level sweep
+(native/LEVEL_SWEEP.md) of all 131 areas for 30 seconds each with no crash
+([native/sweep/results_windows32_wine.md](sweep/results_windows32_wine.md)): the same areas played (108, 6 of them until a game
+over) and the same 23 that can't be started on their own as the 64 bit build's sweep. **Not tested yet:** a real Windows 7,
+Intel's OpenGL driver, and the speed on a slow processor.
 
 ## Building
 
@@ -51,6 +54,9 @@ You need about 3 GB of disk space, your PAL disc image (SLES-52568) and an inter
    ```sh
    wine build/native/cmake-windows-x86/CrashTwinsanity.exe --iso "Z:\path\to\Crash Twinsanity (Europe).iso"
    ```
+
+   Some compositors (KWin on Wayland) hold a window nobody sees at about a frame a second while it waits for the vertical
+   blank: `vblank_mode=0` (Mesa) lets it run while it's hidden. The level sweep's runs (`--headless`) aren't held.
 
 ## What 32 bit Windows needed
 
