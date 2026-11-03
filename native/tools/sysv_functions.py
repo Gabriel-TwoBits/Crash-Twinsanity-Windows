@@ -30,13 +30,21 @@ def main():
     output = Path(sys.argv[1])
     names = labels()
     lines = [
-        "// Made by native/tools/sysv_functions.py: the RETAIL_N32 functions' addresses (the System V convention's on Windows)",
+        "// Made by native/tools/sysv_functions.py: the RETAIL_N32 functions' addresses (TWIN_EABI_CC's on Windows)",
         '#include "common.h"',
+        "",
+        "// The retail names as symbols (abi.h's RETAIL_N32): 32 bit Windows' start with an underscore",
+        "#if defined(_WIN32) && defined(__i386__)",
+        '#define SYMBOL(name) "_" name',
+        "#else",
+        "#define SYMBOL(name) name",
+        "#endif",
         "",
         'extern "C"',
         "{",
     ]
-    lines += [f'    extern const char g_Sysv{index}[] asm("{name}") __attribute__((weak));' for index, name in enumerate(names)]
+    lines += [f'    extern const char g_Sysv{index}[] asm(SYMBOL("{name}")) __attribute__((weak));'
+              for index, name in enumerate(names)]
     lines += [
         "}",
         "",

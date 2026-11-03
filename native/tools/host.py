@@ -5,6 +5,8 @@
     TWIN_HOST_INCLUDES    the libraries' include folders, separated by | (native/CMakeLists.txt) or the system's path
                           separator, else Homebrew's
     TWIN_HOST_LIBS        the libraries the build links (make_stubs.py on Windows: what they define is never stood in for)
+    TWIN_TARGET           the compiler's target triple when it isn't the machine's own (a cross build: i686-w64-mingw32)
+    TWIN_GENERATED        the folder the tools write the build's generated files to, else build/native
 """
 import hashlib
 import json
@@ -15,8 +17,17 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools"))
 import local_config  # noqa: E402
 
-WINDOWS = os.name == "nt"
 CLANG = os.environ.get("TWIN_CLANG") or "clang++"
+TARGET = os.environ.get("TWIN_TARGET", "")
+# The system the build is for, which a cross build's tools don't run on
+WINDOWS = "mingw32" in TARGET or (TARGET == "" and os.name == "nt")
+# 32 bit x86: pointers of 4 bytes, as the PS2's
+X86_32 = TARGET.startswith("i686-")
+POINTER_BYTES = 4 if X86_32 else 8
+# What a C symbol starts with: an underscore on Mach-O and 32 bit Windows (common.h's RETAIL puts it before the retail names)
+SYMBOL_PREFIX = "_" if (X86_32 and WINDOWS) or (TARGET == "" and sys.platform == "darwin") else ""
+HERE = Path(__file__).resolve().parents[2]
+GENERATED = Path(os.environ.get("TWIN_GENERATED") or HERE / "build" / "native")
 
 
 def split_list(value):
@@ -26,7 +37,8 @@ def split_list(value):
 def native_flags():
     """The flags the native build compiles with that change layouts (native/CMakeLists.txt): MinGW lays bitfields out the
     Microsoft way unless told not to, where the PS2's GCC and every other host lay them out the same as each other"""
-    return ["-mno-ms-bitfields"] if WINDOWS else []
+    flags = ["--target=" + TARGET] if TARGET else []
+    return flags + (["-mno-ms-bitfields"] if WINDOWS else [])
 
 
 def host_includes():
@@ -51,9 +63,6 @@ def ee_gxx():
     return local_config.ee_tool("g++")
 
 
-HERE = Path(__file__).resolve().parents[2]
-
-
 def headers_digest():
     """A digest of every header the native build's C++ includes (the game's, the platforms', the stand-ins of PS2SDK's): a
     change to any of them changes every file's results"""
@@ -67,12 +76,12 @@ def headers_digest():
 
 
 class FileCache:
-    """What a tool made of each source file, kept between runs (build/native/<name>.json): a file's result is used again while
+    """What a tool made of each source file, kept between runs (GENERATED/<name>.json): a file's result is used again while
     the file, the headers, the tool and its arguments are the same. The tools run clang on hundreds of files; a change to one
     .cpp file then reruns clang on that one alone"""
 
     def __init__(self, name, salt):
-        self.path = HERE / "build" / "native" / f"{name}.json"
+        self.path = GENERATED / f"{name}.json"
         self.salt = hashlib.sha1((headers_digest() + "\0" + salt).encode()).hexdigest()
         try:
             self.entries = json.loads(self.path.read_text()) if self.path.exists() else {}

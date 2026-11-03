@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Checks the retail functions' calling conventions on Windows (include/abi.h): every function taking floats with its integers
-(a method's object counts) is RETAIL_N32's (System V's there), and lists those RETAIL_N32 that take none.
+(a method's object counts) is RETAIL_N32's (System V's on x64, regcall on x86), and lists those RETAIL_N32 that take none.
 
     check_conventions.py [build/native/data_types.json]
 
@@ -9,11 +9,16 @@ floats out: one that mixes them but isn't RETAIL_N32 would lose its floats there
 code's vtables on every host's EABI stand-in). Exits 1 when there's one.
 """
 import json
+import os
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import host  # noqa: E402
+
 FLOATS = {"f32", "float", "const f32", "const float"}
+# TWIN_EABI_CC's attribute in a function's canonical type: x64's and x86's
+EABI_ATTRIBUTES = ("sysv_abi", "regcall")
 
 
 def parameters(canonical):
@@ -47,7 +52,7 @@ def parameters(canonical):
 
 
 def main():
-    path = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "build" / "native" / "data_types.json"
+    path = Path(sys.argv[1]) if len(sys.argv) > 1 else host.GENERATED / "data_types.json"
     types = json.loads(path.read_text())
     if not any(info.get("method") for info in types.values()):
         sys.exit(f"{path} has no methods marked: made before data_types.py recorded them (build again)")
@@ -61,7 +66,7 @@ def main():
         floats = sum(p in FLOATS for p in params)
         others = len(params) - floats + (1 if info.get("method") else 0)
         mixed = floats > 0 and others > 0
-        sysv = "sysv_abi" in info["canonical"]
+        sysv = any(attribute in info["canonical"] for attribute in EABI_ATTRIBUTES)
         if mixed and not sysv:
             missing.append((label, info["name"], info["canonical"]))
         elif sysv and not mixed:

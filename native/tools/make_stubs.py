@@ -6,21 +6,26 @@ what the game reached that isn't there yet; nothing pretends to work.
 
     native/tools/make_stubs.py <out.cpp> <objects...>
 """
-import json, os, subprocess, sys
+import json, os, re, subprocess, sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parents[2]
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import host  # noqa: E402
 
-WINDOWS = sys.platform == "win32"
-# The host's nm and c++filt: LLVM's next to the compiler on Windows (LLVM-MinGW has no c++filt of that name)
+WINDOWS = host.WINDOWS
+# The nm and c++filt for the target's objects: LLVM's next to the compiler for Windows' (LLVM-MinGW has no c++filt of that name;
+# a distribution's clang-N has llvm-nm-N)
 if WINDOWS:
     TOOLS = Path(host.CLANG).parent if os.path.dirname(host.CLANG) else Path(".")
-    NM = str(TOOLS / "llvm-nm.exe") if (TOOLS / "llvm-nm.exe").exists() else "llvm-nm"
-    CXXFILT = str(TOOLS / "llvm-cxxfilt.exe") if (TOOLS / "llvm-cxxfilt.exe").exists() else "llvm-cxxfilt"
+    version = re.search(r"-\d+$", Path(host.CLANG).name)
+    SUFFIX = version.group(0) if version else ""
+    NM = str(TOOLS / "llvm-nm.exe") if (TOOLS / "llvm-nm.exe").exists() else "llvm-nm" + SUFFIX
+    CXXFILT = str(TOOLS / "llvm-cxxfilt.exe") if (TOOLS / "llvm-cxxfilt.exe").exists() else "llvm-cxxfilt" + SUFFIX
 else:
     NM, CXXFILT = "nm", "c++filt"
+# Mach-O's and 32 bit Windows' C and C++ symbols have an underscore in front of the names the C++ gives (common.h's RETAIL)
+PREFIX = host.SYMBOL_PREFIX
 
 out, objects = Path(sys.argv[1]), []
 for argument in sys.argv[2:]:
@@ -31,7 +36,7 @@ for argument in sys.argv[2:]:
         objects.append(argument)
 defined, undefined = set(), set()
 # Windows' command lines are at most 32767 characters
-CHUNK = 40 if WINDOWS else 200
+CHUNK = 40 if os.name == "nt" else 200
 for chunk in range(0, len(objects), CHUNK):
     lines = subprocess.run([NM, "-A"] + objects[chunk:chunk + CHUNK], capture_output=True, text=True).stdout.splitlines()
     for line in lines:
@@ -42,13 +47,12 @@ for chunk in range(0, len(objects), CHUNK):
             undefined.add(parts[-1])
 missing = undefined - defined
 
-prefix = "_" if sys.platform == "darwin" else ""
-types = json.loads((HERE / "build" / "native" / "data_types.json").read_text())
-retail_functions = {prefix + label for label, info in types.items() if info["kind"] == "function"}
+types = json.loads((host.GENERATED / "data_types.json").read_text())
+retail_functions = {PREFIX + label for label, info in types.items() if info["kind"] == "function"}
 # The retail data (the split's labels): converted by native/tools/convert_data.py, so none should be missing
 split_labels = {line.split()[1] for path in (HERE / "asm" / "data").glob("*.s") for line in path.read_text().splitlines()
                 if line.startswith(("dlabel ", "glabel "))}
-retail_variables = {prefix + label for label, info in types.items() if info["kind"] == "var" and label in split_labels}
+retail_variables = {PREFIX + label for label, info in types.items() if info["kind"] == "var" and label in split_labels}
 
 def demangle(names):
     result = subprocess.run([CXXFILT], input="\n".join(names), capture_output=True, text=True).stdout.splitlines()
@@ -58,7 +62,7 @@ def demangle(names):
 import re
 ps2_sources = "\n".join(p.read_text(errors="ignore") for p in (HERE / "src" / "platform" / "ps2").rglob("*.cpp"))
 def defined_by_ps2(name):
-    bare = name[1:] if sys.platform == "darwin" and name.startswith("_") and not name.startswith("__Z") else name
+    bare = name[1:] if PREFIX != "" and name.startswith(PREFIX) and not name.startswith("__Z") else name
     return re.match(r"^[A-Za-z_]\w*$", bare) is not None and (
         re.search(r"\b" + re.escape(bare) + r"\s*\(", ps2_sources) is not None
         or re.search(r"RETAIL(?:_N32)?\(" + re.escape(bare) + r"\)", ps2_sources) is not None)
@@ -77,7 +81,8 @@ def system_symbols():
         # The MinGW runtime's and C++ library's (the toolchain's lib folder), Windows' own import libraries, SDL's and FFmpeg's
         # ($TWIN_HOST_LIBS, the import libraries the build links)
         libraries = []
-        for folder in (TOOLS.parent / "x86_64-w64-mingw32" / "lib", TOOLS.parent / "lib"):
+        triple = host.TARGET or "x86_64-w64-mingw32"
+        for folder in (TOOLS.parent / triple / "lib", TOOLS.parent / "lib"):
             for name in ("libucrt.a", "libucrtbase.a", "libmsvcrt.a", "libmingwex.a", "libmingw32.a", "libc++.a", "libunwind.a",
                          "libkernel32.a", "libuser32.a", "libwinpthread.a", "libpthread.a", "libm.a", "libmoldname.a",
                          "libapi-ms-win-crt-runtime-l1-1-0.a"):
@@ -100,11 +105,11 @@ def system_symbols():
 system = system_symbols()
 missing -= system
 names = sorted(missing)
-readable = demangle([n[1:] if sys.platform == "darwin" and n.startswith("__Z") else n for n in names]) if names else {}
+readable = demangle([n[1:] if PREFIX != "" and n.startswith("__Z") else n for n in names]) if names else {}
 stubs, variables = [], []
 for name in names:
-    pretty = readable.get(name[1:] if sys.platform == "darwin" and name.startswith("__Z") else name, name)
-    bare_name = name[1:] if sys.platform == "darwin" and name.startswith("_") else name
+    pretty = readable.get(name[1:] if PREFIX != "" and name.startswith("__Z") else name, name)
+    bare_name = name[1:] if PREFIX != "" and name.startswith(PREFIX) else name
     if name in retail_variables or bare_name in split_labels:
         # Retail data is never stood in for by a function: a missing object fails the build
         variables.append(pretty)

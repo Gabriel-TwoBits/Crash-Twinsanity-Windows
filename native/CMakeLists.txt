@@ -19,6 +19,16 @@ endif()
 set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O2 -gline-tables-only -DNDEBUG")
 set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g")
 
+# The files the build generates (the retail data as C++, the stand-ins...): build/native, or a cross build's own folder, its
+# layouts being its target's (native/tools/host.py's TWIN_GENERATED)
+set(TWIN_GENERATED_DIR ${ROOT}/build/native CACHE PATH "The folder of the files the native tools generate")
+# 32 bit x86 (native/WINDOWS32.md): pointers of 4 bytes, the x87's floats replaced by SSE's
+if(CMAKE_SIZEOF_VOID_P EQUAL 4)
+    set(TWIN_X86_32 ON)
+else()
+    set(TWIN_X86_32 OFF)
+endif()
+
 find_package(SDL3 REQUIRED CONFIG)
 find_package(OpenGL REQUIRED)
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
@@ -116,7 +126,7 @@ endif()
 string(REPLACE ";" "|" TWIN_HOST_INCLUDES_ENV "${TWIN_HOST_INCLUDES}")
 string(REPLACE ";" "|" TWIN_HOST_LIBS_ENV "${TWIN_HOST_LIBS}")
 set(TWIN_TOOL_ENV ${CMAKE_COMMAND} -E env "TWIN_CLANG=${CMAKE_CXX_COMPILER}" "TWIN_HOST_INCLUDES=${TWIN_HOST_INCLUDES_ENV}"
-    "TWIN_HOST_LIBS=${TWIN_HOST_LIBS_ENV}")
+    "TWIN_HOST_LIBS=${TWIN_HOST_LIBS_ENV}" "TWIN_TARGET=${CMAKE_CXX_COMPILER_TARGET}" "TWIN_GENERATED=${TWIN_GENERATED_DIR}")
 
 # The game's C++, and the decomp's own C++ of the retail C library and maths (portable, kept for their exact results)
 file(GLOB GAME_SOURCES CONFIGURE_DEPENDS ${ROOT}/src/game/*.cpp)
@@ -128,12 +138,12 @@ set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${ROOT}/native/re
 file(GLOB_RECURSE PLATFORM_SOURCES CONFIGURE_DEPENDS ${ROOT}/src/platform/native/*.cpp)
 
 # The retail data as C++, made again when the split, the converter or the C++'s declarations change
-set(DATA_CPP ${ROOT}/build/native/data.cpp)
+set(DATA_CPP ${TWIN_GENERATED_DIR}/data.cpp)
 file(GLOB DATA_INPUTS CONFIGURE_DEPENDS ${ROOT}/asm/data/*.s ${ROOT}/include/*.h ${ROOT}/include/*/*.h)
 # Windows: every function taking floats with its integers declared RETAIL_N32 (System V's: include/abi.h's CallEabi)
 set(TWIN_CHECK_CONVENTIONS)
 if(WIN32)
-    set(TWIN_CHECK_CONVENTIONS COMMAND ${Python3_EXECUTABLE} native/tools/check_conventions.py)
+    set(TWIN_CHECK_CONVENTIONS COMMAND ${TWIN_TOOL_ENV} ${Python3_EXECUTABLE} native/tools/check_conventions.py)
 endif()
 add_custom_command(
     OUTPUT ${DATA_CPP}
@@ -150,7 +160,7 @@ add_custom_command(
 # Everything compiled once into objects; the stand-ins for what the platform layer doesn't do yet (weak, native/tools/
 # make_stubs.py) are made from what the objects leave undefined, then the program is linked
 # The script commands' arguments as the files have them (native/tools/script_layouts.py)
-set(SCRIPT_LAYOUTS_CPP ${ROOT}/build/native/scriptlayouts.cpp)
+set(SCRIPT_LAYOUTS_CPP ${TWIN_GENERATED_DIR}/scriptlayouts.cpp)
 add_custom_command(
     OUTPUT ${SCRIPT_LAYOUTS_CPP}
     COMMAND ${TWIN_TOOL_ENV} ${Python3_EXECUTABLE} native/tools/script_layouts.py
@@ -161,23 +171,24 @@ add_custom_command(
 
 # VU1's programs translated to C++ from the game's microcode (native/tools/vu1_translate.py; native/GRAPHICS.md, "VU1
 # translation")
-set(VU1_PROGRAMS_CPP ${ROOT}/build/native/vu1programs.cpp)
+set(VU1_PROGRAMS_CPP ${TWIN_GENERATED_DIR}/vu1programs.cpp)
 foreach(shard RANGE 7)
-    list(APPEND VU1_PROGRAMS_CPP ${ROOT}/build/native/vu1programs_${shard}.cpp)
+    list(APPEND VU1_PROGRAMS_CPP ${TWIN_GENERATED_DIR}/vu1programs_${shard}.cpp)
 endforeach()
 add_custom_command(
     OUTPUT ${VU1_PROGRAMS_CPP}
-    COMMAND ${TWIN_TOOL_ENV} ${Python3_EXECUTABLE} native/tools/vu1_translate.py ${ROOT}/build/native/vu1programs.cpp
+    COMMAND ${TWIN_TOOL_ENV} ${Python3_EXECUTABLE} native/tools/vu1_translate.py ${TWIN_GENERATED_DIR}/vu1programs.cpp
     WORKING_DIRECTORY ${ROOT}
     DEPENDS ${ROOT}/native/tools/vu1_translate.py ${ROOT}/native/tools/vudecode.py ${ROOT}/assets/vutext.textbin.bin
             ${ROOT}/asm/data/vudata.data.s ${ROOT}/src/platform/native/graphics/renderer/vuprograms.cpp
     COMMENT "Translating VU1's programs"
     VERBATIM)
 # VU0's microprogram sets the same way (vu1_translate.py --vu0)
-set(VU0_PROGRAMS_CPP ${ROOT}/build/native/vu0programs.cpp ${ROOT}/build/native/vu0programs_0.cpp ${ROOT}/build/native/vu0programs_1.cpp)
+set(VU0_PROGRAMS_CPP ${TWIN_GENERATED_DIR}/vu0programs.cpp ${TWIN_GENERATED_DIR}/vu0programs_0.cpp
+    ${TWIN_GENERATED_DIR}/vu0programs_1.cpp)
 add_custom_command(
     OUTPUT ${VU0_PROGRAMS_CPP}
-    COMMAND ${TWIN_TOOL_ENV} ${Python3_EXECUTABLE} native/tools/vu1_translate.py --vu0 ${ROOT}/build/native/vu0programs.cpp
+    COMMAND ${TWIN_TOOL_ENV} ${Python3_EXECUTABLE} native/tools/vu1_translate.py --vu0 ${TWIN_GENERATED_DIR}/vu0programs.cpp
     WORKING_DIRECTORY ${ROOT}
     DEPENDS ${ROOT}/native/tools/vu1_translate.py ${ROOT}/native/tools/vudecode.py ${ROOT}/assets/vutext.textbin.bin
     COMMENT "Translating VU0's programs"
@@ -204,7 +215,7 @@ if(TWIN_EMULATION_LTO)
     set_property(SOURCE ${TWIN_EMULATION_SOURCES} APPEND PROPERTY COMPILE_OPTIONS -flto=thin)
     set(TWIN_LTO_LINK -flto=thin)
 endif()
-set(STUBS_CPP ${ROOT}/build/native/stubs.cpp)
+set(STUBS_CPP ${TWIN_GENERATED_DIR}/stubs.cpp)
 # The objects' list in a file (@file): it's longer than Windows' command lines
 set(STUBS_OBJECTS ${CMAKE_CURRENT_BINARY_DIR}/stub_objects.txt)
 file(GENERATE OUTPUT ${STUBS_OBJECTS} CONTENT "$<JOIN:$<TARGET_OBJECTS:game>,
@@ -222,7 +233,7 @@ add_custom_command(
 # (native/tools/sysv_functions.py, include/abi.h's CallEabi)
 set(TWIN_SYSV_CPP)
 if(WIN32)
-    set(TWIN_SYSV_CPP ${ROOT}/build/native/sysv_functions.cpp)
+    set(TWIN_SYSV_CPP ${TWIN_GENERATED_DIR}/sysv_functions.cpp)
     file(GLOB_RECURSE TWIN_SYSV_INPUTS CONFIGURE_DEPENDS ${ROOT}/include/*.h ${ROOT}/src/*.h ${ROOT}/src/*.cpp)
     add_custom_command(
         OUTPUT ${TWIN_SYSV_CPP}
@@ -248,9 +259,17 @@ if(WIN32)
     # MinGW lays bitfields out the Microsoft way by default; the game's (and its files') are GCC's, as on every other host
     # (native/tools/host.py gives the layout tools the same flag)
     target_compile_options(${target} PRIVATE -mno-ms-bitfields)
-    # x86-64-v2 (SSE4.2, POPCNT: what Windows 11 needs of a processor anyway): floor and ceil inline (SSE4.1's ROUNDSS), the
-    # rest as before. No FMA (that's v3), and the float arithmetic stays IEEE's, so the results don't change
-    target_compile_options(${target} PRIVATE -march=x86-64-v2)
+    if(TWIN_X86_32)
+        # x86-64-v2's instructions on 32 bit x86 (SSE4.2, POPCNT: Intel's Core i since 2008, AMD's since 2011), the floats in
+        # SSE's registers: the x87's 80 bit intermediates would round the game's float maths differently
+        target_compile_options(${target} PRIVATE -march=i686 -msse4.2 -mpopcnt -mfpmath=sse)
+        # common.h's RETAIL makes every retail function cdecl, and its variables take the attribute too, which ignores it
+        target_compile_options(${target} PRIVATE -Wno-ignored-attributes)
+    else()
+        # x86-64-v2 (SSE4.2, POPCNT: what Windows 11 needs of a processor anyway): floor and ceil inline (SSE4.1's ROUNDSS),
+        # the rest as before. No FMA (that's v3), and the float arithmetic stays IEEE's, so the results don't change
+        target_compile_options(${target} PRIVATE -march=x86-64-v2)
+    endif()
 endif()
 endforeach()
 if(WIN32)
@@ -258,7 +277,10 @@ if(WIN32)
     # g_NativeLowMemory's address, which has to fit 32 bits (src/platform/native/lowmemory_win32.cpp). The C++ runtime is
     # linked in; SDL, FFmpeg and OpenGL stay DLLs
     target_link_options(twinsanity PRIVATE ${TWIN_LTO_LINK} -static -Wl,--image-base=0x10000000 -Wl,--disable-dynamicbase
-                        -Wl,--disable-high-entropy-va -Wl,--stack,8388608)
+                        -Wl,--stack,8388608)
+    if(NOT TWIN_X86_32)
+        target_link_options(twinsanity PRIVATE -Wl,--disable-high-entropy-va)
+    endif()
     set_target_properties(twinsanity PROPERTIES OUTPUT_NAME "CrashTwinsanity")
     # A windowed program (no console; the log goes to the terminal that started it, else to log.txt in the settings folder,
     # src/platform/native/entry.cpp), or a console one

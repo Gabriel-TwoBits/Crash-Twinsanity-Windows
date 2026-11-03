@@ -14,6 +14,8 @@ FLAGS = ["-std=gnu++2c", "-fsyntax-only", "-DTWIN_NATIVE", "-Inative/include", "
 DECL = re.compile(r"^[\s|`-]*(VarDecl|FunctionDecl|CXXMethodDecl)\s+0x[0-9a-f]+\s.*?\s(\w+)\s'([^']*)'(?::'([^']*)')?")
 # Some clang builds (Debian's 21.1) print IsLiteralLabel after the label
 LABEL = re.compile(r"^[\s|`-]*AsmLabelAttr\s+0x[0-9a-f]+\s.*\s\"([^\"]+)\"(?:\s+IsLiteralLabel)?\s*$")
+# common.h's RETAIL on 32 bit Windows: the cdecl a variable's type takes and ignores
+VARIABLE_CONVENTION = " __attribute__((cdecl))"
 
 def scan(path):
     out = subprocess.run([host.CLANG] + FLAGS + [path], capture_output=True, text=True, cwd=HERE).stdout.splitlines()
@@ -34,12 +36,16 @@ def scan(path):
             # A variable declared without extern is defined by the C++ (the converter leaves it out)
             rest = line[m.end():]
             defined = m.group(1) == "VarDecl" and not re.search(r"\bextern\b", rest)
-            pending = (m.group(1), m.group(2), m.group(3), m.group(4) or m.group(3), defined)
+            typ, canonical = m.group(3), m.group(4) or m.group(3)
+            if m.group(1) == "VarDecl":
+                typ, canonical = typ.replace(VARIABLE_CONVENTION, ""), canonical.replace(VARIABLE_CONVENTION, "")
+            pending = (m.group(1), m.group(2), typ, canonical, defined)
             continue
         m = LABEL.match(line)
         if m and pending:
-            # common.h's RETAIL puts Mach-O's underscore in front of the retail name
-            label = m.group(1)[1:] if sys.platform == "darwin" and m.group(1).startswith("_") else m.group(1)
+            # common.h's RETAIL puts Mach-O's and 32 bit Windows' underscore in front of the retail name
+            prefixed = host.SYMBOL_PREFIX != "" and m.group(1).startswith(host.SYMBOL_PREFIX)
+            label = m.group(1)[len(host.SYMBOL_PREFIX):] if prefixed else m.group(1)
             kind, name, typ, canonical, defined = pending
             previous = found.get(label, {})
             if previous.get("unlabelled"):
@@ -96,7 +102,7 @@ with ThreadPoolExecutor(10) as pool:
                     continue
             types[label] = info
 cache.save()
-out = HERE / "build" / "native" / "data_types.json"
+out = host.GENERATED / "data_types.json"
 out.parent.mkdir(parents=True, exist_ok=True)
 out.write_text(json.dumps(types, indent=1, sort_keys=True))
 print(f"{len(types)} retail symbols ({sum(t['kind'] == 'var' for t in types.values())} variables) -> {out.relative_to(HERE)}")
