@@ -397,7 +397,9 @@ extern "C"
     }
 
     // Sony's printf (scePrintf) wrote to the debugger's console a line at a time, with interrupts off. What a call prints past
-    // 255 characters is cut (PS2SDK's messages and libmpeg's are a line)
+    // 255 characters is cut (PS2SDK's messages and libmpeg's are a line). MinGW's C99 stdio (32 bit Windows' msvcrt) defines
+    // printf inline in its header: the native build's kputs writes to standard output, as that printf does
+#if !(defined(__MINGW32__) && __USE_MINGW_ANSI_STDIO)
     int printf(const char* format, ...)
     {
         char text[PrintfSize];
@@ -408,6 +410,7 @@ extern "C"
         TtyPutText(text);
         return length;
     }
+#endif
 
     int puts(const char* text)
     {

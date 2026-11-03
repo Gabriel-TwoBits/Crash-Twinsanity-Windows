@@ -82,6 +82,15 @@ std::vector<DWORD> OtherThreads()
     return threads;
 }
 
+#if defined(__i386__)
+// TRADEOFF: 32 bit x86 has no unwinding tables and the build omits frame pointers: the innermost frame only, a flat profile.
+// Whole stacks would take -fno-omit-frame-pointer and a walk of the ebp chain
+u32 Walk(CONTEXT context, DWORD64* frames)
+{
+    frames[0] = context.Eip;
+    return 1;
+}
+#else
 // The stack of a stopped thread from its context (RtlVirtualUnwind: nothing it calls may take a lock the thread holds, so no
 // allocation here)
 u32 Walk(CONTEXT context, DWORD64* frames)
@@ -112,6 +121,7 @@ u32 Walk(CONTEXT context, DWORD64* frames)
 
     return count;
 }
+#endif
 
 void Profile(std::string path, double delay, double seconds)
 {

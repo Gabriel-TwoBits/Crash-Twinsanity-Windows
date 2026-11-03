@@ -1,10 +1,11 @@
-// The PS2's low memory for the retail code's null pointers, on Windows (x86-64): what lowmemory.cpp does with a signal handler
-// on arm64, done with a vectored exception handler. Windows never maps the first 64 KB, so a load or store faulting below
+// The PS2's low memory for the retail code's null pointers, on Windows (x86-64 and 32 bit x86): what lowmemory.cpp does with a
+// signal handler on arm64, done with a vectored exception handler. Windows never maps the first 64 KB, so a load or store faulting below
 // LowMemoryLimit is carried out on g_NativeLowMemory instead (native/NATIVE.md).
 //
 // The faulting instruction isn't emulated: a copy of it is run. Every x86 instruction reaching memory through a ModRM byte
 // computes its address as registers + displacement, so the copy's displacement is made larger by g_NativeLowMemory's address
-// (a 32 bit one: the executable is linked below 2 GB, native/CMakeLists.txt). The copy, in a trampoline of the thread's own,
+// (a 32 bit one: the executable is linked below 2 GB, native/CMakeLists.txt; 32 bit x86's addresses wrap at 32 bits, so any
+// address does there). The copy, in a trampoline of the thread's own,
 // reads or writes g_NativeLowMemory's bytes at the address the original faulted on, with the instruction's own effect on
 // registers and flags, then jumps back past the original (its length decoded: prefixes, opcode, ModRM, SIB, displacement and
 // immediate). No single step: a debugger sees nothing of it. A jump or call through low memory crashes, as on the PS2.
@@ -24,6 +25,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
+#include <iterator>
 #include <thread>
 
 #define WIN32_LEAN_AND_MEAN
@@ -44,6 +46,29 @@ constexpr u32 TrampolineBytes = 64;
 
 thread_local u8* t_Trampoline = nullptr;
 LONG g_Emulated = 0;
+
+// The instruction pointer and the stack pointer of a thread's context
+#if defined(__i386__)
+DWORD64 ProgramCounter(const CONTEXT& context)
+{
+    return context.Eip;
+}
+
+void SetProgramCounter(CONTEXT& context, DWORD64 address)
+{
+    context.Eip = static_cast<DWORD>(address);
+}
+#else
+DWORD64 ProgramCounter(const CONTEXT& context)
+{
+    return context.Rip;
+}
+
+void SetProgramCounter(CONTEXT& context, DWORD64 address)
+{
+    context.Rip = address;
+}
+#endif
 
 // The bytes at an address that can be read (the instruction's, up to the end of what's committed)
 u32 ReadableBytes(const u8* at, u32 wanted)
@@ -137,11 +162,11 @@ s32 ImmediateSize(u32 map, u8 opcode, u8 reg, bool operand16)
 
 // The trampoline for the instruction at code: a copy of it with its memory operand moved by delta, then a jump to the
 // instruction after it. False for what can't be done this way (no ModRM memory operand, RIP-relative, VEX/EVEX, a jump or
-// call through memory, an opcode this doesn't know)
+// call through memory, 32 bit x86's 16 bit addressing, an opcode this doesn't know)
 bool MakeTrampoline(const u8* code, u32 available, u32 delta, u8* out)
 {
     u32 at = 0;
-    bool address32 = false;
+    bool addressPrefix = false;
     bool operand16 = false;
     // Legacy prefixes
     while (at < available)
@@ -159,7 +184,7 @@ bool MakeTrampoline(const u8* code, u32 available, u32 delta, u8* out)
         }
         else if (byte == 0x67)
         {
-            address32 = true;
+            addressPrefix = true;
             at++;
         }
         else
@@ -168,7 +193,14 @@ bool MakeTrampoline(const u8* code, u32 available, u32 delta, u8* out)
         }
     }
 
-    // REX (W makes the operand 64 bits, over 66: the immediates stay 32 bits)
+#if defined(__i386__)
+    // The address size prefix makes 32 bit x86's addressing 16 bit's (none of the native build's code)
+    if (addressPrefix)
+    {
+        return false;
+    }
+#else
+    // REX (W makes the operand 64 bits, over 66: the immediates stay 32 bits). 32 bit x86's 40-4F are INC and DEC
     if (at < available && (code[at] & 0xF0) == 0x40)
     {
         if ((code[at] & 8) != 0)
@@ -178,6 +210,7 @@ bool MakeTrampoline(const u8* code, u32 available, u32 delta, u8* out)
 
         at++;
     }
+#endif
 
     if (at >= available)
     {
@@ -195,8 +228,12 @@ bool MakeTrampoline(const u8* code, u32 available, u32 delta, u8* out)
     u32 copied = 0;
     if (opcode >= 0xA0 && opcode <= 0xA3)
     {
-        // MOV with an absolute address (moffs): 8 bytes of it, 4 with the address size prefix
-        u32 size = address32 ? 4 : 8;
+        // MOV with an absolute address (moffs): 8 bytes of it, 4 with the address size prefix or on 32 bit x86
+#if defined(__i386__)
+        u32 size = 4;
+#else
+        u32 size = addressPrefix ? 4 : 8;
+#endif
         length = at + 1 + size;
         if (length > available)
         {
@@ -259,7 +296,8 @@ bool MakeTrampoline(const u8* code, u32 available, u32 delta, u8* out)
             return false;
         }
 
-        bool sibNoBase = false;
+        // A 32 bit displacement without a base register: the SIB's no-base form, or 32 bit x86's absolute address
+        bool noBase = false;
         if (rm == 4)
         {
             if (at >= available)
@@ -267,17 +305,34 @@ bool MakeTrampoline(const u8* code, u32 available, u32 delta, u8* out)
                 return false;
             }
 
-            sibNoBase = mod == 0 && (code[at] & 7) == 5;
+            noBase = mod == 0 && (code[at] & 7) == 5;
             at++;
         }
         else if (mod == 0 && rm == 5)
         {
+#if defined(__i386__)
+            noBase = true;
+#else
             // RIP-relative: next to the code, never low
             return false;
+#endif
         }
 
         u32 dispAt = at;
-        u32 dispSize = mod == 1 ? 1 : mod == 2 || sibNoBase ? 4 : 0;
+        u32 dispSize = 0;
+        if (mod == 1)
+        {
+            dispSize = 1;
+        }
+        else if (mod == 2 || noBase)
+        {
+            dispSize = 4;
+        }
+        else
+        {
+            // mod 0 with a base register: no displacement
+            dispSize = 0;
+        }
         length = dispAt + dispSize + static_cast<u32>(immediate);
         if (length > available || length > MaxInstruction)
         {
@@ -297,15 +352,18 @@ bool MakeTrampoline(const u8* code, u32 available, u32 delta, u8* out)
         }
 
         s64 moved = displacement + delta;
+#if !defined(__i386__)
+        // 32 bit x86's addresses wrap at 32 bits: any displacement reaches
         if (moved > INT32_MAX || moved < INT32_MIN)
         {
             return false;
         }
+#endif
 
-        // The copy: what comes before the displacement, the displacement as 32 bits (mod 2, or the SIB's no-base form kept),
-        // then the immediate
+        // The copy: what comes before the displacement, the displacement as 32 bits (mod 2, or the no-base form kept), then
+        // the immediate
         std::memcpy(out, code, dispAt);
-        if (!sibNoBase)
+        if (!noBase)
         {
             out[modrmAt] = static_cast<u8>((2 << 6) | (reg << 3) | rm);
         }
@@ -316,11 +374,22 @@ bool MakeTrampoline(const u8* code, u32 available, u32 delta, u8* out)
         copied = dispAt + 4 + static_cast<u32>(immediate);
     }
 
+#if defined(__i386__)
+    // jmp rel32 to the address after the original (the 32 bit address space wraps)
+    constexpr u8 JumpRelative = 0xE9;
+    constexpr u32 JumpBytes = 5;
+    out[copied] = JumpRelative;
+    u32 back = static_cast<u32>(reinterpret_cast<uiptr>(code) + length);
+    u32 from = static_cast<u32>(reinterpret_cast<uiptr>(out) + copied + JumpBytes);
+    u32 relative = back - from;
+    std::memcpy(out + copied + 1, &relative, sizeof(relative));
+#else
     // jmp [rip + 0], then the address after the original
     static const u8 jump[] = {0xFF, 0x25, 0x00, 0x00, 0x00, 0x00};
     std::memcpy(out + copied, jump, sizeof(jump));
     u64 back = reinterpret_cast<u64>(code) + length;
     std::memcpy(out + copied + sizeof(jump), &back, sizeof(back));
+#endif
     return true;
 }
 
@@ -354,14 +423,15 @@ LONG CALLBACK OnException(EXCEPTION_POINTERS* exception)
     ULONG_PTR kind = record->ExceptionInformation[0];
     uiptr address = record->ExceptionInformation[1];
     u8* trampoline = Trampoline();
-    DWORD64 start = reinterpret_cast<DWORD64>(trampoline);
-    if (kind == 8 || address >= LowMemoryLimit || context->Rip == address || trampoline == nullptr ||
-        (context->Rip >= start && context->Rip < start + TrampolineBytes))
+    DWORD64 start = reinterpret_cast<uiptr>(trampoline);
+    DWORD64 pc = ProgramCounter(*context);
+    if (kind == 8 || address >= LowMemoryLimit || pc == address || trampoline == nullptr ||
+        (pc >= start && pc < start + TrampolineBytes))
     {
         return EXCEPTION_CONTINUE_SEARCH;
     }
 
-    const u8* code = reinterpret_cast<const u8*>(context->Rip);
+    const u8* code = reinterpret_cast<const u8*>(static_cast<uiptr>(pc));
     u32 available = ReadableBytes(code, MaxInstruction);
     uiptr delta = reinterpret_cast<uiptr>(g_NativeLowMemory);
     if (delta > INT32_MAX - LowMemoryLimit || !MakeTrampoline(code, available, static_cast<u32>(delta), trampoline))
@@ -370,7 +440,7 @@ LONG CALLBACK OnException(EXCEPTION_POINTERS* exception)
     }
 
     FlushInstructionCache(GetCurrentProcess(), trampoline, TrampolineBytes);
-    context->Rip = start;
+    SetProgramCounter(*context, start);
     if (InterlockedIncrement(&g_Emulated) == 1 && Native::GetSettings().logStubs)
     {
         // Once: the PS2's way with its null pointers is being followed (see native/NATIVE.md)
@@ -403,7 +473,7 @@ void ReadSymbols()
     }
 
     const auto* dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(base);
-    const auto* nt = reinterpret_cast<const IMAGE_NT_HEADERS64*>(base + dos->e_lfanew);
+    const auto* nt = reinterpret_cast<const IMAGE_NT_HEADERS*>(base + dos->e_lfanew);
     DWORD tableAt = nt->FileHeader.PointerToSymbolTable;
     DWORD count = nt->FileHeader.NumberOfSymbols;
     HANDLE file = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr);
@@ -473,7 +543,7 @@ void ReadSymbols()
             // Section names (".text") aren't functions
             if (name[0] != '.')
             {
-                g_Symbols[g_SymbolCount++] = {reinterpret_cast<DWORD64>(base) + sections[section - 1].VirtualAddress + value, name};
+                g_Symbols[g_SymbolCount++] = {reinterpret_cast<uiptr>(base) + sections[section - 1].VirtualAddress + value, name};
             }
         }
 
@@ -527,7 +597,7 @@ void DescribeAddress(DWORD64 address, char* out, size_t size)
         }
 
         int used = std::snprintf(out, size, "%016llx %s+%#llx", static_cast<unsigned long long>(address), name,
-                                 static_cast<unsigned long long>(address - reinterpret_cast<DWORD64>(module)));
+                                 static_cast<unsigned long long>(address - reinterpret_cast<uiptr>(module)));
         const FunctionSymbol* function = module == GetModuleHandleW(nullptr) ? FunctionAt(address) : nullptr;
         if (function != nullptr && used > 0 && static_cast<size_t>(used) < size)
         {
@@ -540,6 +610,103 @@ void DescribeAddress(DWORD64 address, char* out, size_t size)
     std::snprintf(out, size, "%016llx ?", static_cast<unsigned long long>(address));
 }
 
+bool Readable(const void* address, size_t size);
+
+#if defined(__i386__)
+// The stack words scanned for return addresses, and the longest call instruction (FF /2 with a SIB and a 32 bit displacement)
+constexpr u32 StackScanWords = 4096;
+constexpr u32 LongestCall = 7;
+
+// Whether a value is a return address: in a module's code, just after a call (E8 rel32, or FF /2 through a register or memory)
+bool IsReturnAddress(u32 value)
+{
+    const auto* after = reinterpret_cast<const u8*>(static_cast<uiptr>(value));
+    MEMORY_BASIC_INFORMATION info;
+    constexpr DWORD Executable = PAGE_EXECUTE | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY;
+    if (value < LongestCall || VirtualQuery(after, &info, sizeof(info)) == 0 || info.State != MEM_COMMIT ||
+        info.Type != MEM_IMAGE || (info.Protect & Executable) == 0 || !Readable(after - LongestCall, LongestCall))
+    {
+        return false;
+    }
+
+    // E8 rel32, and FF /2 (ModRM's reg 2): its opcode and ModRM, then a SIB and a displacement as mod and r/m say
+    constexpr u8 CallRelative = 0xE8;
+    constexpr s32 CallRelativeBytes = 5;
+    constexpr u8 CallIndirect = 0xFF;
+    constexpr u8 CallIndirectReg = 2;
+    constexpr u32 OpcodeAndModRmBytes = 2;
+    constexpr u32 SibBytes = 1;
+    constexpr u32 Displacement8Bytes = 1;
+    constexpr u32 Displacement32Bytes = 4;
+    if (after[-CallRelativeBytes] == CallRelative)
+    {
+        return true;
+    }
+
+    for (u32 length = OpcodeAndModRmBytes; length <= LongestCall; length++)
+    {
+        u8 modrm = after[1 - static_cast<s32>(length)];
+        if (after[-static_cast<s32>(length)] != CallIndirect || ((modrm >> 3) & 7) != CallIndirectReg)
+        {
+            continue;
+        }
+
+        u8 mod = modrm >> 6;
+        u8 rm = modrm & 7;
+        u32 expected = OpcodeAndModRmBytes + (rm == 4 && mod != 3 ? SibBytes : 0);
+        if (mod == 1)
+        {
+            expected += Displacement8Bytes;
+        }
+        else if (mod == 2 || (mod == 0 && rm == 5))
+        {
+            expected += Displacement32Bytes;
+        }
+        else
+        {
+            // mod 3 (a register) or mod 0 with a base register: nothing more (a SIB's no-base form is taken as none)
+            expected += 0;
+        }
+
+        if (expected == length)
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+// TRADEOFF: 32 bit x86 has no unwinding tables and the build omits frame pointers: the stack is scanned for return addresses,
+// which can list a stale one left by a call that returned. -fno-omit-frame-pointer and the ebp chain would make it exact
+void WriteBacktrace(CONTEXT context, int most)
+{
+    char line[MAX_PATH + 64];
+    char where[MAX_PATH + 48];
+    DescribeAddress(context.Eip, where, sizeof(where));
+    std::snprintf(line, sizeof(line), "  #0  %s\n", where);
+    WriteError(line);
+    const auto* stack = reinterpret_cast<const u32*>(static_cast<uiptr>(context.Esp));
+    int frame = 1;
+    for (u32 word = 0; word < StackScanWords && frame < most; word++)
+    {
+        if (!Readable(stack + word, sizeof(u32)))
+        {
+            break;
+        }
+
+        if (!IsReturnAddress(stack[word]))
+        {
+            continue;
+        }
+
+        DescribeAddress(stack[word], where, sizeof(where));
+        std::snprintf(line, sizeof(line), "  #%-2d %s (stack +%#x)\n", frame, where, word * static_cast<u32>(sizeof(u32)));
+        WriteError(line);
+        frame++;
+    }
+}
+#else
 // The stack's return addresses from a context, by the executable's unwinding tables
 void WriteBacktrace(CONTEXT context, int most)
 {
@@ -566,6 +733,7 @@ void WriteBacktrace(CONTEXT context, int most)
         RtlVirtualUnwind(UNW_FLAG_NHANDLER, imageBase, context.Rip, function, &context, &handlerData, &establisher, nullptr);
     }
 }
+#endif
 
 // Memory that can be read (the crash report reads the game's structures, which may be what went wrong)
 bool Readable(const void* address, size_t size)
@@ -636,17 +804,24 @@ LONG CALLBACK OnUnhandled(EXCEPTION_POINTERS* exception)
     CONTEXT* context = exception->ContextRecord;
     char message[256];
     char where[MAX_PATH + 48];
-    DescribeAddress(context->Rip, where, sizeof(where));
+    DescribeAddress(ProgramCounter(*context), where, sizeof(where));
     unsigned long long address = record->NumberParameters >= 2 ? record->ExceptionInformation[1] : 0;
     std::snprintf(message, sizeof(message), "[native] fatal exception %#lx at %#llx (pc %s), backtrace:\n",
                   static_cast<unsigned long>(record->ExceptionCode), address, where);
     WriteError(message);
+#if defined(__i386__)
+    const DWORD64 registers[] = {context->Eax, context->Ebx, context->Ecx, context->Edx,
+                                 context->Esi, context->Edi, context->Ebp, context->Esp};
+    static const char* const names[] = {"eax", "ebx", "ecx", "edx", "esi", "edi", "ebp", "esp"};
+#else
     const DWORD64 registers[] = {context->Rax, context->Rbx, context->Rcx, context->Rdx, context->Rsi, context->Rdi,
                                  context->Rbp, context->Rsp, context->R8,  context->R9,  context->R10, context->R11,
                                  context->R12, context->R13, context->R14, context->R15};
     static const char* const names[] = {"rax", "rbx", "rcx", "rdx", "rsi", "rdi", "rbp", "rsp",
                                         "r8",  "r9",  "r10", "r11", "r12", "r13", "r14", "r15"};
-    for (int i = 0; i < 16; i += 4)
+#endif
+    static_assert(std::size(registers) % 4 == 0, "the registers are written four a line");
+    for (size_t i = 0; i < std::size(registers); i += 4)
     {
         std::snprintf(message, sizeof(message), "  %-3s %016llx  %-3s %016llx  %-3s %016llx  %-3s %016llx\n", names[i],
                       static_cast<unsigned long long>(registers[i]), names[i + 1],
