@@ -14,6 +14,24 @@ import zipfile
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parents[2]
+# A PE file's COFF header: its offset kept at 0x3C (32 bits), then after the "PE\0\0" signature the machine (16 bits; 0x14C:
+# 32 bit x86)
+PE_HEADER_OFFSET_AT = 0x3C
+PE_HEADER_OFFSET_BYTES = 4
+PE_SIGNATURE_BYTES = 4
+PE_MACHINE_BYTES = 2
+PE_MACHINE_I386 = 0x14C
+# The 32 bit build (native/WINDOWS32.md) links the distribution's MinGW-w64 winpthreads in, whose licence (expat) wants its
+# notice with the program: Debian's copyright file of MinGW-w64 has it
+MINGW_COPYRIGHT = Path("/usr/share/doc/mingw-w64-common/copyright")
+
+
+def pe_machine(exe):
+    """The machine a Windows executable is for (its COFF header's)"""
+    data = exe.read_bytes()
+    header = int.from_bytes(data[PE_HEADER_OFFSET_AT:PE_HEADER_OFFSET_AT + PE_HEADER_OFFSET_BYTES], "little")
+    at = header + PE_SIGNATURE_BYTES
+    return int.from_bytes(data[at:at + PE_MACHINE_BYTES], "little")
 
 
 def main():
@@ -52,6 +70,11 @@ def main():
     shutil.copy2(HERE / "native" / "third_party" / "stb" / "LICENSE.txt", licenses / "stb-LICENSE.txt")
     # The port's own licence (what it covers is in it)
     shutil.copy2(HERE / "LICENSE", licenses / "Crash-Twinsanity-Windows-LICENSE.txt")
+    if pe_machine(exe) == PE_MACHINE_I386:
+        if MINGW_COPYRIGHT.exists():
+            shutil.copy2(MINGW_COPYRIGHT, licenses / "mingw-w64-LICENSE.txt")
+        else:
+            sys.exit(f"no {MINGW_COPYRIGHT}: the 32 bit build carries MinGW-w64's winpthreads, whose licence goes with it")
     deps = Path(arguments.deps)
     found = sorted(deps.glob("SDL3-*/LICENSE.txt"))
     if found:
