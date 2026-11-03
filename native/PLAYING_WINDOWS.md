@@ -7,6 +7,10 @@ https://github.com/GioPixelGH/Crash-Twinsanity-Windows
 ## What you need
 
 - 64 bit Windows 10 or 11, and a graphics card with OpenGL 3.3 (any from the last ten years).
+- Or, with the 32 bit build (`Crash-Twinsanity-Windows-32bit.zip`): 32 bit Windows 7 SP1 or later, a processor with SSE4.2
+  (Intel Core i, AMD since 2011) and the graphics card's own driver with OpenGL 3.3 (Intel HD 4000 and later: Intel's driver,
+  not Windows' basic one). It has been tried in Wine only so far, not on a real Windows 7. On 64 bit Windows, take the 64 bit
+  build: it's faster.
 - A disc image of **your own** PAL copy of Crash Twinsanity (Europe/Australia, SLES-52568), as an `.iso` (or `.bin`/`.img`).
   Other versions (USA, Japan) aren't supported.
 

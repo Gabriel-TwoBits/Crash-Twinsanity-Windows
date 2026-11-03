@@ -25,6 +25,8 @@ Windows needs, makes it run at a steady 60 fps, and fixes the crashes found by p
   [Building on Windows](#building-on-windows).
 - **Linux:** builds and plays on x86-64 (tried on Debian 13), and packs into an AppImage: see
   [native/LINUX.md](native/LINUX.md).
+- **32 bit Windows (Windows 7 and later):** cross-compiled on Linux, and plays in Wine; not tried on a real Windows 7 yet:
+  see [native/WINDOWS32.md](native/WINDOWS32.md).
 - **macOS:** the platform code is HAB3X's and the Windows changes are kept apart (`_WIN32`), but this fork isn't built or
   tested on macOS.
 
