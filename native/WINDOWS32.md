@@ -68,7 +68,7 @@ You need about 3 GB of disk space, your PAL disc image (SLES-52568) and an inter
 | The crash report and the hang watch | No unwinding tables, and the build omits frame pointers | The registers are x86's; the backtrace scans the stack for return addresses (a value in a module's code just after a call), which may list a stale one |
 | The profiler (`$TWIN_PROFILE`) | No unwinding tables | The innermost frame only: a flat profile |
 | `printf` (libc.cpp) | MinGW's C99 stdio (on with msvcrt) defines `printf` inline in its header | The PS2 C library's `printf` is left out there: the native `kputs` writes to standard output, as MinGW's does |
-| Thread-local variables (toolchain-mingw-i686.cmake) | The distribution's libstdc++ was built by GCC, which emulates them on MinGW | `-femulated-tls` |
+| Thread-local variables (overlay.cpp) | The distribution's libstdc++ was built by GCC, which emulates them on MinGW: `std::call_once`'s inline code reads its state from them, which clang's native ones don't link with | The overlay's fonts are loaded once under a flag and a lock; the program's own `thread_local`s stay native (`-femulated-tls` would make every one a call, the GS's per primitive among them) |
 
 The toolchain file (`native/toolchain-mingw-i686.cmake`) links with lld, the C++ runtime and winpthreads statically: the
 program needs only Windows' own DLLs, SDL's and FFmpeg's (which need only Windows' own: libgcc linked in).

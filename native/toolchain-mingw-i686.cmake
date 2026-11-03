@@ -8,9 +8,6 @@ set(CMAKE_CXX_COMPILER_TARGET i686-w64-mingw32)
 set(CMAKE_RC_COMPILER i686-w64-mingw32-windres)
 set(CMAKE_EXE_LINKER_FLAGS_INIT "-fuse-ld=lld")
 set(CMAKE_SHARED_LINKER_FLAGS_INIT "-fuse-ld=lld")
-# GCC's thread-local variables (libstdc++'s call_once's among them) are emulated on MinGW, which clang's aren't unless told
-set(CMAKE_C_FLAGS_INIT "-femulated-tls")
-set(CMAKE_CXX_FLAGS_INIT "-femulated-tls")
 # libstdc++'s threads are winpthreads' (the posix flavour of the cross compiler), which clang's MinGW driver doesn't add
 set(CMAKE_C_STANDARD_LIBRARIES "-lpthread" CACHE STRING "")
 set(CMAKE_CXX_STANDARD_LIBRARIES "-lpthread" CACHE STRING "")

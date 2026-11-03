@@ -33,7 +33,10 @@ struct FontFile
 };
 
 FontFile g_Fonts[static_cast<u32>(OverlayFont::Count)];
-std::once_flag g_FontsLoaded;
+// The fonts loaded once, by whichever thread asks first: a flag and a lock rather than std::call_once, whose state 32 bit MinGW's
+// libstdc++ keeps in GCC's emulated thread-local variables (native/WINDOWS32.md)
+std::atomic<bool> g_FontsLoaded{false};
+std::mutex g_FontsLock;
 
 bool ReadFile(const std::string& path, std::vector<unsigned char>* out)
 {
@@ -105,7 +108,16 @@ void LoadFonts()
 
 const stbtt_fontinfo* OverlayFontInfo(OverlayFont face)
 {
-    std::call_once(g_FontsLoaded, LoadFonts);
+    if (!g_FontsLoaded.load(std::memory_order_acquire))
+    {
+        std::lock_guard guard(g_FontsLock);
+        if (!g_FontsLoaded.load(std::memory_order_relaxed))
+        {
+            LoadFonts();
+            g_FontsLoaded.store(true, std::memory_order_release);
+        }
+    }
+
     const FontFile& font = g_Fonts[static_cast<u32>(face)];
     return font.loaded ? &font.info : nullptr;
 }
