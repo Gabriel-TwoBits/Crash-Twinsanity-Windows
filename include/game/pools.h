@@ -30,12 +30,12 @@ struct ItemPool
     T* items;
     const GccVTableEntry* vtable;
 
-    static ItemPool* Construct(ItemPool* pool);
-    void Destroy(u32 destroyFlags);
-    void Grow();
+    static ItemPool* Construct(ItemPool* pool) RETAIL_CC;
+    void Destroy(u32 destroyFlags) RETAIL_CC;
+    void Grow() RETAIL_CC;
     // A slot taken (the pool grown when it's full), and one given an item
-    s32 Allocate();
-    s32 Add(const T* item);
+    s32 Allocate() RETAIL_CC;
+    s32 Add(const T* item) RETAIL_CC;
 
     void VirtualDestroy(u32 destroyFlags)
     {
@@ -59,7 +59,7 @@ struct PoolWalkBase
 {
     const GccVTableEntry* vtable;
 
-    void Destroy(u32 destroyFlags);
+    void Destroy(u32 destroyFlags) RETAIL_CC;
 };
 
 // A pool's (0xC bytes; its vtable also has 6 copied from another, 7 the slot, 8 the pool's count): the slot it's at and how many
@@ -71,14 +71,14 @@ struct PoolWalk : PoolWalkBase<T>
     s16 position;
     ItemPool<T>* pool;
 
-    void Destroy(u32 destroyFlags);
-    void First();
-    u32 AtEnd();
-    T* Item();
-    void Next();
-    PoolWalk* Assign(const PoolWalk* other);
-    s32 Slot();
-    s32 Count();
+    void Destroy(u32 destroyFlags) RETAIL_CC;
+    void First() RETAIL_CC;
+    u32 AtEnd() RETAIL_CC;
+    T* Item() RETAIL_CC;
+    void Next() RETAIL_CC;
+    PoolWalk* Assign(const PoolWalk* other) RETAIL_CC;
+    s32 Slot() RETAIL_CC;
+    s32 Count() RETAIL_CC;
 };
 
 // A set of pools' (0x14 bytes): a pool's walk for each pool it was made with that has items
@@ -90,11 +90,11 @@ struct PoolsWalk : PoolWalkBase<T>
     PoolWalk<T>* current;
     PoolWalk<T>** walks;
 
-    void Destroy(u32 destroyFlags);
-    void First();
-    u32 AtEnd();
-    T* Item();
-    void Next();
+    void Destroy(u32 destroyFlags) RETAIL_CC;
+    void First() RETAIL_CC;
+    u32 AtEnd() RETAIL_CC;
+    T* Item() RETAIL_CC;
+    void Next() RETAIL_CC;
 };
 
 extern "C"

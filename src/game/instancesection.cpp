@@ -307,9 +307,10 @@ void DestroyKindReader(InstanceKindReader* reader, u32 destroyFlags)
 }
 
 // The element read registered with the layout (its index the count of the kind's list so far) and added to the list, which is
-// made with room for 10 when there's none
+// made with room for 10 when there's none. The registering methods are retail ones (common.h's RETAIL_CC)
 template <typename Element>
-void AddElement(InstanceKindReader* reader, Element* element, void (LayoutInstances::*registerElement)(u32, u32, Element*))
+void AddElement(InstanceKindReader* reader, Element* element,
+                void (RETAIL_CC LayoutInstances::*registerElement)(u32, u32, Element*))
 {
     PointerArray<void>* list = *reader->list;
     (reader->layout->*registerElement)(list != nullptr ? list->count : 0, reader->count, element);

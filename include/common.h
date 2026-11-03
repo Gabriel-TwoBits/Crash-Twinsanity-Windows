@@ -41,11 +41,23 @@ constexpr u32 ShiftMask = 0x1F;
 
 // A function or variable by the name the retail executable's symbols give it (the asm's and the Ghidra project's): a function
 // defined with it takes the retail one's place, a variable declared with it is the retail data the split keeps
-#if defined(TWIN_NATIVE) && defined(__APPLE__)
-// Mach-O's C symbols start with an underscore (and a name starting with L would be the assembler's own local label)
-#define RETAIL(name) asm("_" #name)
+//
+// RETAIL_CC is a retail function's calling convention. 32 bit MinGW's methods are thiscall (the object in ecx), but a retail
+// vtable's or function pointer's function is called as a plain one, the object first (gcc2.h's CallVirtual, abi.h's CallEabi):
+// there every retail function is cdecl, and a template's members its explicit specializations give retail names declare it
+// too. A variable's type takes no calling convention (the attribute is ignored there: native/CMakeLists.txt's
+// -Wno-ignored-attributes)
+#if defined(TWIN_NATIVE) && defined(_WIN32) && defined(__i386__)
+#define RETAIL_CC __attribute__((cdecl))
 #else
-#define RETAIL(name) asm(#name)
+#define RETAIL_CC
+#endif
+#if defined(TWIN_NATIVE) && (defined(__APPLE__) || (defined(_WIN32) && defined(__i386__)))
+// Mach-O's and 32 bit Windows' C symbols start with an underscore (and a name starting with L would be the assembler's own
+// local label)
+#define RETAIL(name) asm("_" #name) RETAIL_CC
+#else
+#define RETAIL(name) asm(#name) RETAIL_CC
 #endif
 
 #ifdef TWIN_NATIVE

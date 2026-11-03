@@ -21,8 +21,16 @@
 // another: the functions the retail code calls with floats and integers mixed take the System V convention there, which, as the
 // EABI, AAPCS64 (macOS) and Linux's, fills the integers' and the floats' registers each in their own order. Calls through the
 // retail vtables and pointers with mixed arguments go the same way (CallEabi, gcc2.h's CallVirtual)
+#if defined(__i386__)
+// 32 bit x86's own conventions pass every argument on the stack in its position. regcall fills eax, ecx, edx, edi and esi
+// with the integers and xmm0-7 with the floats, each in their own order, as the EABI (Intel's regcall; clang's regcall on x86)
+#define TWIN_EABI_CC __attribute__((regcall))
+// RETAIL's cdecl left out: a function has one convention
+#define RETAIL_N32(name) asm("_" #name) TWIN_EABI_CC
+#else
 #define TWIN_EABI_CC __attribute__((sysv_abi))
 #define RETAIL_N32(name) RETAIL(name) TWIN_EABI_CC
+#endif
 #elif defined(TWIN_NATIVE)
 #define TWIN_EABI_CC
 #define RETAIL_N32(name) RETAIL(name)
