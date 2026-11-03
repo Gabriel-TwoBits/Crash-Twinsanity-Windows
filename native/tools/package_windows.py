@@ -2,7 +2,7 @@
 """The Windows release (native/WINDOWS.md): the built program with what it needs beside it, made into
 build/native/dist/Crash Twinsanity/ and build/native/dist/Crash-Twinsanity-Windows.zip.
 
-    .venv\\Scripts\\python.exe native\\tools\\package_windows.py [--build build/native/cmake]
+    .venv\\Scripts\\python.exe native\\tools\\package_windows.py [--build build/native/cmake] [--zip NAME]
 
 The folder holds CrashTwinsanity.exe, SDL's and FFmpeg's DLLs, the UI's fonts, the libraries' licences and the player's guide
 (native/PLAYING_WINDOWS.md as README.txt). Nothing of the game's: the player picks their own disc image.
@@ -21,6 +21,8 @@ def main():
     parser.add_argument("--build", default=str(HERE / "build" / "native" / "cmake"))
     parser.add_argument("--deps", default=str(HERE / "build" / "native" / "deps"),
                         help="where build_windows.py put SDL3 and FFmpeg (for their licences)")
+    parser.add_argument("--zip", default="Crash-Twinsanity-Windows.zip",
+                        help="the archive's name in build/native/dist (the 32 bit build's apart from the 64 bit one's)")
     arguments = parser.parse_args()
     build = Path(arguments.build)
     exe = build / "CrashTwinsanity.exe"
@@ -68,7 +70,7 @@ def main():
 
     shutil.copy2(HERE / "native" / "PLAYING_WINDOWS.md", folder / "README.txt")
 
-    archive = dist / "Crash-Twinsanity-Windows.zip"
+    archive = dist / arguments.zip
     if archive.exists():
         archive.unlink()
     with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as z:

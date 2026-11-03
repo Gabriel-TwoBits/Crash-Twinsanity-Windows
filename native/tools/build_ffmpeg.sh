@@ -4,11 +4,12 @@
 # MPEG video parser; the PSS files are demultiplexed by pss.cpp and their sound goes the game's own way). Shared libraries, so
 # whoever has the app can swap them for their own build (the LGPL's relinking clause). See native/third_party/ffmpeg/README.md.
 #
-#   native/tools/build_ffmpeg.sh [ARCH]
+#   native/tools/build_ffmpeg.sh [ARCH [OS]]
 #
 # ARCH is the host's (uname -m) unless given: arm64 or x86_64 on macOS (the other one is cross-compiled), the host's on Linux.
-# It installs into build/native/ffmpeg/<os>-<arch> (macos-arm64, macos-x86_64, linux-x86_64...), where native/CMakeLists.txt
-# looks first. The source release (native/third_party/ffmpeg-src/, not in git) is downloaded from ffmpeg.org when it isn't
+# OS windows with ARCH x86 on Linux cross-compiles 32 bit Windows' DLLs with $CC (clang) and the MinGW-w64 cross toolchain
+# (native/WINDOWS32.md). It installs into build/native/ffmpeg/<os>-<arch> (macos-arm64, macos-x86_64, linux-x86_64,
+# windows-x86...), where native/CMakeLists.txt looks first. The source release (native/third_party/ffmpeg-src/, not in git) is downloaded from ffmpeg.org when it isn't
 # there, checked against the SHA-256 below, and against its signature by FFmpeg's release key when gpg is installed.
 set -eu
 
@@ -33,6 +34,14 @@ esac
 HOST_ARCH=$(uname -m)
 [ "$HOST_ARCH" = aarch64 ] && HOST_ARCH=arm64
 ARCH=${1:-$HOST_ARCH}
+CROSS_WINDOWS=no
+if [ "${2:-}" = windows ] && [ "$OS" = linux ] && [ "$ARCH" = x86 ]; then
+    OS=windows
+    CROSS_WINDOWS=yes
+elif [ -n "${2:-}" ] && [ "${2:-}" != "$OS" ]; then
+    echo "build_ffmpeg.sh: $ARCH $2 can't be built on $(uname -s)" >&2
+    exit 1
+fi
 PREFIX=$ROOT/build/native/ffmpeg/$OS-$ARCH
 BUILD=$ROOT/build/native/ffmpeg/build-$OS-$ARCH
 
@@ -78,7 +87,14 @@ set -- \
     --disable-avdevice --disable-avformat --disable-avfilter --disable-swresample --disable-swscale \
     --enable-decoder=mpeg2video --enable-parser=mpegvideo \
     --enable-shared --disable-static
-if [ "$OS" = windows ]; then
+if [ "$CROSS_WINDOWS" = yes ]; then
+    # 32 bit Windows' DLLs from Linux: clang for i686-w64-mingw32 with the MinGW-w64 cross toolchain's runtime (msvcrt) and
+    # binutils, linked by lld
+    CC=${CC:-clang}
+    set -- "$@" --enable-cross-compile --target-os=mingw32 --arch=x86 --enable-w32threads \
+        --cc="$CC --target=i686-w64-mingw32" --ld="$CC --target=i686-w64-mingw32 -fuse-ld=lld" \
+        --cross-prefix=i686-w64-mingw32- --extra-cflags="-march=i686 -msse4.2 -mfpmath=sse" --extra-ldflags=-static-libgcc
+elif [ "$OS" = windows ]; then
     # MinGW's DLLs (avcodec-63.dll and avutil-61.dll with their import libraries), Windows' own threads
     set -- "$@" --target-os=mingw32 --arch=x86_64 --enable-w32threads --cc=x86_64-w64-mingw32-clang --ar=llvm-ar \
         --nm=llvm-nm --ranlib=llvm-ranlib
@@ -99,7 +115,7 @@ if [ "$OS" = macos ]; then
 fi
 # x86's hand-written assembly needs nasm; without it the C (slower, and not checked to give the same pictures: native/
 # movie-tests compares them)
-if [ "$ARCH" = x86_64 ] && ! command -v nasm > /dev/null; then
+if { [ "$ARCH" = x86_64 ] || [ "$ARCH" = x86 ]; } && ! command -v nasm > /dev/null; then
     echo "build_ffmpeg.sh: no nasm, x86 assembly off"
     set -- "$@" --disable-x86asm
 fi

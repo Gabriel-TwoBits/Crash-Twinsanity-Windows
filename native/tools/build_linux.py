@@ -88,18 +88,24 @@ def download(url, target, sha256):
         sys.exit(f"{target}'s SHA-256 is {actual}, not {sha256}")
 
 
-def own_sdl(cmake, ninja, clang):
-    """SDL3 built from its source release into SDL_PREFIX when it isn't there. Its video and audio backends' development
-    packages have to be installed (native/LINUX.md lists them; its configure names a missing one); it loads their libraries at
-    run time"""
-    if (SDL_PREFIX / "lib" / "cmake" / "SDL3" / "SDL3Config.cmake").exists():
-        return SDL_PREFIX
+def sdl_source():
+    """SDL3's source release, downloaded (checked by its SHA-256) and unpacked into DEPS when it isn't there"""
     archive = DEPS / f"SDL3-{SDL_VERSION}.tar.gz"
     download(SDL_URL, archive, SDL_SHA256)
     source = DEPS / f"SDL3-{SDL_VERSION}"
     if not source.exists():
         with tarfile.open(archive) as tar:
             tar.extractall(DEPS, filter="data")
+    return source
+
+
+def own_sdl(cmake, ninja, clang):
+    """SDL3 built from its source release into SDL_PREFIX when it isn't there. Its video and audio backends' development
+    packages have to be installed (native/LINUX.md lists them; its configure names a missing one); it loads their libraries at
+    run time"""
+    if (SDL_PREFIX / "lib" / "cmake" / "SDL3" / "SDL3Config.cmake").exists():
+        return SDL_PREFIX
+    source = sdl_source()
     build = DEPS / f"SDL3-{SDL_VERSION}-build"
     subprocess.run([cmake, "-S", str(source), "-B", str(build), "-G", "Ninja", f"-DCMAKE_MAKE_PROGRAM={ninja}",
                     f"-DCMAKE_C_COMPILER={clang}", "-DCMAKE_BUILD_TYPE=Release", f"-DCMAKE_INSTALL_PREFIX={SDL_PREFIX}",
